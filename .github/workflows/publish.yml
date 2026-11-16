@@ -1,0 +1,100 @@
+name: Publish to npm
+
+# Publishes @getmyenv/shared, @getmyenv/crypto and getmyenv from this public
+# repository with npm trusted publishing (OIDC). No npm token exists anywhere:
+# npm checks that the run comes from this repository, this workflow file and
+# the "npm" environment, then attaches a provenance attestation that links
+# each version to this commit.
+#
+# Run it from the Actions tab (Run workflow) after the sync commit for a new
+# version lands on main. A version already on npm is skipped.
+#
+# CI can only stage a version. It goes live when a maintainer approves it with
+# 2FA: `npm stage list`, then `npm stage approve <stage-id>`, in order shared,
+# crypto, CLI. A stolen workflow run cannot release anything on its own.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build, test and pack only. Publish nothing."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2
+        with:
+          runtime: node@24
+          install: false
+
+      - name: Only from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "Publish runs from main only."
+          exit 1
+
+      # The npm bundled with Node 24 has no `npm stage`. Pinned, not latest.
+      - name: npm with staged publishing
+        run: |
+          npm install -g npm@11.21.2
+          npm --version
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build, test and smoke test
+        run: pnpm check
+
+      - run: pnpm audit --prod --audit-level=high
+
+      - name: Pack and publish
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/packs"
+          mkdir -p "$out"
+          # Order matters: the CLI depends on the exact shared and crypto versions.
+          for dir in packages/shared packages/crypto packages/cli; do
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "Skip $name@$version: already on npm."
+              continue
+            fi
+            # pnpm pack turns workspace:* into real versions.
+            rm -f "$out"/*.tgz
+            (cd "$dir" && pnpm pack --pack-destination "$out" >/dev/null)
+            tgz=$(ls "$out"/*.tgz)
+            echo "Contents of $name@$version:"
+            tar -tzf "$tgz"
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "Dry run: not staging $name@$version."
+              continue
+            fi
+            # npm stage publish packs the current folder, so stage from the
+            # unpacked pnpm tarball, where workspace:* is already a version.
+            work="$RUNNER_TEMP/stage-$(basename "$dir")"
+            rm -rf "$work" && mkdir -p "$work"
+            tar -xzf "$tgz" -C "$work"
+            (cd "$work/package" && npm stage publish --access public --provenance)
+            echo "Staged $name@$version. Approve it with: npm stage list, then npm stage approve <stage-id>"
+          done

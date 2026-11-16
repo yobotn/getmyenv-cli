@@ -5,8 +5,11 @@
  */
 
 export const MCP_PROTOCOL_VERSION = "2025-06-18";
-/** Versions this server speaks, newest first. */
-export const MCP_SUPPORTED_VERSIONS = [MCP_PROTOCOL_VERSION, "2025-03-26", "2024-11-05"];
+/**
+ * Versions this server speaks. Only 2025-06-18: older versions allow JSON-RPC
+ * batches, which this server refuses. Other clients are offered this version.
+ */
+export const MCP_SUPPORTED_VERSIONS = [MCP_PROTOCOL_VERSION];
 
 export const JSONRPC_PARSE_ERROR = -32700;
 export const JSONRPC_INVALID_REQUEST = -32600;
@@ -120,8 +123,15 @@ export function schemaError(schema: JsonSchema, value: unknown, at = "arguments"
   return null;
 }
 
+/** 1 and "1" are different JSON-RPC ids. */
+function idKey(id: JsonRpcId): string {
+  return `${typeof id}:${id}`;
+}
+
 export class McpServer {
   private readonly byName: Map<string, McpTool>;
+  /** Requests still running, by id, so notifications/cancelled can drop the reply. */
+  private readonly inFlight = new Map<string, { cancelled: boolean }>();
 
   constructor(
     private readonly info: ServerInfo,
@@ -158,20 +168,41 @@ export class McpServer {
       if (hasId && ("result" in message || "error" in message)) return null;
       return this.error(id, JSONRPC_INVALID_REQUEST, "Invalid Request");
     }
-    if (message.params !== undefined && !isObject(message.params) && !Array.isArray(message.params)) {
-      return hasId ? this.error(id, JSONRPC_INVALID_REQUEST, "Invalid Request") : null;
+    // MCP params are always an object. An array or a scalar is a bad parameter.
+    if (message.params !== undefined && !isObject(message.params)) {
+      return hasId ? this.error(id, JSONRPC_INVALID_PARAMS, "Invalid params: params must be an object.") : null;
     }
-    // Notifications (initialized, cancelled, ...) get no reply.
-    if (!hasId) return null;
-
     const params = isObject(message.params) ? message.params : {};
+    // Notifications (initialized, cancelled, ...) get no reply.
+    if (!hasId) {
+      if (message.method === "notifications/cancelled") this.cancel(params.requestId);
+      return null;
+    }
+
+    const key = idKey(id!);
+    const call = { cancelled: false };
+    // initialize is never cancelled (MCP spec).
+    if (message.method !== "initialize") this.inFlight.set(key, call);
     try {
       const result = await this.dispatch(message.method, params);
-      return { jsonrpc: "2.0", id, result };
+      return call.cancelled ? null : { jsonrpc: "2.0", id, result };
     } catch (err) {
+      if (call.cancelled) return null;
       if (err instanceof RpcError) return this.error(id, err.code, err.message);
       return this.error(id, JSONRPC_INTERNAL_ERROR, err instanceof Error ? err.message : "Internal error");
+    } finally {
+      if (this.inFlight.get(key) === call) this.inFlight.delete(key);
     }
+  }
+
+  /**
+   * The client gave up on a request. The work may still finish, but no reply is
+   * sent. An unknown or finished id is ignored.
+   */
+  private cancel(requestId: unknown): void {
+    if (!isId(requestId)) return;
+    const call = this.inFlight.get(idKey(requestId));
+    if (call) call.cancelled = true;
   }
 
   private async dispatch(method: string, params: Record<string, unknown>): Promise<unknown> {

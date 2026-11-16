@@ -51,6 +51,46 @@ export function splitRunArgs(
   return { command: operands };
 }
 
+/** Each flag name of an option ("-c, --context <slug>"), and whether it takes a value. */
+function flagNames(flags: string): { names: string[]; takesValue: boolean } {
+  return {
+    names: flags.split(/[ ,|]+/).filter((f) => f.startsWith("-")),
+    takesValue: /[<[]/.test(flags),
+  };
+}
+
+/**
+ * `run` lets unknown options through for the child command. Before `--` (or,
+ * without `--`, before the first command word), an unknown option is a typo:
+ * `run --explian -- echo hi` must not make "--explian" the context.
+ * Returns the first unknown option, or null.
+ */
+export function unknownRunOption(argv: string[]): string | null {
+  const start = argv.indexOf("run", 2);
+  if (start < 0) return null;
+  const options = [...cliCommand("run").options, CLI_API_OPTION, ...CLI_GLOBAL_OPTIONS].map((o) => flagNames(o.flags));
+  const known = new Map<string, boolean>();
+  for (const o of options) for (const n of o.names) known.set(n, o.takesValue);
+  const hasDash = argv.indexOf("--", start + 1) >= 0;
+  for (let i = start + 1; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--") break;
+    if (!arg.startsWith("-") || arg === "-") {
+      // Without `--`, the first plain word starts the command and its own flags.
+      if (!hasDash) break;
+      continue;
+    }
+    // `-cstaging`: a short flag with its value attached.
+    if (!arg.startsWith("--") && arg.length > 2 && known.get(arg.slice(0, 2)) === true) continue;
+    const eq = arg.indexOf("=");
+    const name = eq > 0 ? arg.slice(0, eq) : arg;
+    const takesValue = known.get(name);
+    if (takesValue === undefined) return name;
+    if (takesValue && eq < 0) i++;
+  }
+  return null;
+}
+
 /** A command, its arguments, flags and examples, all from the shared CLI spec. */
 function define(parent: Command, name: string, withApi = true): Command {
   const spec: CliCommand = cliCommand(name);
@@ -99,6 +139,8 @@ export function buildProgram(argv: string[]): Command {
     .allowUnknownOption(true)
     .allowExcessArguments(true)
     .action(async (_ctx: string | undefined, opts, cmd: Command) => {
+      const unknown = unknownRunOption(argv);
+      if (unknown) throw new Error(`Unknown option ${unknown}. See: npx getmyenv run --help`);
       const split = splitRunArgs(cmd.args, argv, opts.explain === true);
       if (opts.context && split.context && opts.context !== split.context) {
         throw new Error(`Two contexts given: ${split.context} and -c ${opts.context}. Pick one.`);

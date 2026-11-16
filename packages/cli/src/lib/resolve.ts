@@ -67,6 +67,12 @@ async function waitForGrant(client: ApiClient, pending: ResolvePending): Promise
   throw new Error("Approval request expired. Run the command again.");
 }
 
+/** The server's reason, then one retry step, with one period between them. */
+export function grantRefusedMessage(serverMessage: string): string {
+  const reason = serverMessage.trim().replace(/[.!?\s]+$/, "");
+  return reason ? `${reason}. Run the command again.` : "Run the command again.";
+}
+
 /**
  * Ciphertext for one context. Read-only contexts need a server token, an
  * allowed IP, and a trusted machine or an approval in the dashboard.
@@ -83,8 +89,9 @@ export async function resolveValues(
     try {
       res = await resolveOnce(client, projectId, slug, purpose, grant);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        throw new Error(`${err.message}. Run the command again.`);
+      // The grant was refused: 401 today, or the code grant_invalid.
+      if (err instanceof ApiError && (err.status === 401 || err.code === "grant_invalid")) {
+        throw new Error(grantRefusedMessage(err.message));
       }
       throw err;
     }

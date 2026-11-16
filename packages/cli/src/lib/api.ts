@@ -109,12 +109,24 @@ export class ApiError extends Error {
   status: number;
   /** Machine-readable reason from the server, like `token_ended`. */
   code?: string;
-  constructor(message: string, status: number, code?: string) {
+  /** What to do next, from the server. Printed under the message. */
+  hint?: string;
+  constructor(message: string, status: number, code?: string, hint?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.hint = hint;
   }
+}
+
+/** The lines the CLI prints for a failed command: the message, then the server's hint. */
+export function cliErrorLines(err: unknown): string[] {
+  const message = err instanceof Error ? err.message : "Unexpected error";
+  const lines = [message];
+  const hint = err instanceof ApiError ? err.hint?.trim() : undefined;
+  if (hint && !message.includes(hint)) lines.push(hint);
+  return lines;
 }
 
 export function resolveApiUrl(cliOverride?: string): string {
@@ -177,18 +189,24 @@ export class ApiClient {
           if (!res.ok) {
             let serverMessage: string | undefined;
             let code: string | undefined;
+            let hint: string | undefined;
             try {
-              const data = (await res.json()) as { error?: string; code?: unknown };
+              const data = (await res.json()) as { error?: string; code?: unknown; hint?: unknown };
               serverMessage = data.error;
               if (typeof data.code === "string") code = data.code;
+              if (typeof data.hint === "string" && data.hint.trim()) hint = data.hint.trim();
             } catch {
               /* ignore */
             }
-            const message =
-              res.status >= 500
-                ? `The getmyenv server had an error (HTTP ${res.status}). Try again in a moment.`
-                : (serverMessage ?? `HTTP ${res.status}`);
-            throw new ApiError(message, res.status, code);
+            if (res.status >= 500) {
+              // A server error keeps the generic line, with no hint.
+              throw new ApiError(
+                `The getmyenv server had an error (HTTP ${res.status}). Try again in a moment.`,
+                res.status,
+                code
+              );
+            }
+            throw new ApiError(serverMessage ?? `HTTP ${res.status}`, res.status, code, hint);
           }
           if (res.status === 204) return undefined as T;
           try {

@@ -21,7 +21,7 @@ import {
 } from "../lib/fs.js";
 import { readFolderToken, writeFolderToken } from "../lib/credentials.js";
 import { ApiClient, ApiError, resolveApiUrl, type WhoamiResponse } from "../lib/api.js";
-import { authorizeFolder, openBrowser, sleep } from "../lib/authorize.js";
+import { authorizeFolder, openBrowser, pollWithRetry, sleep } from "../lib/authorize.js";
 import { createAccountKeys, type NewAccountKeys } from "../lib/recovery-code.js";
 import type { VaultInfo } from "../lib/vault.js";
 
@@ -121,11 +121,13 @@ async function ownerClient(apiUrl: string, claim: ClaimFile): Promise<ApiClient>
     }
   }
   console.error(pc.dim("Sign in and pick this project to finish.\n"));
-  const who = await authorizeFolder({ apiUrl });
+  const pickAgain = (picked: string) => `You picked ${picked}. Run claim again and pick ${claim.projectName}.`;
+  const who = await authorizeFolder({
+    apiUrl,
+    expected: { id: claim.projectId, name: claim.projectName, mismatch: pickAgain },
+  });
   if (who.project.id !== claim.projectId) {
-    throw new Error(
-      `You picked ${who.project.name}. Run claim again and pick ${claim.projectName}.`
-    );
+    throw new Error(pickAgain(who.project.name));
   }
   const token = readFolderToken()?.token;
   if (!token) throw new Error("Sign-in did not save a token. Run claim again.");
@@ -205,11 +207,17 @@ export async function claimCommand(opts: ClaimOpts = {}): Promise<void> {
   const deadline = new Date(session.expiresAt).getTime();
   let newToken: string | null = null;
   while (Date.now() < deadline) {
-    const poll = await client.request<PollRes>("POST", "/api/claim/poll", {
-      claimCode: claim.claimCode,
-      sessionId: session.sessionId,
-      pollSecret: session.pollSecret,
-    });
+    // A dropped connection or a server hiccup is retried until the deadline.
+    const poll = await pollWithRetry(
+      () =>
+        client.request<PollRes>("POST", "/api/claim/poll", {
+          claimCode: claim.claimCode,
+          sessionId: session.sessionId,
+          pollSecret: session.pollSecret,
+        }),
+      deadline
+    );
+    if (!poll) break;
     if (poll.status === "approved" && poll.token) {
       newToken = poll.token;
       break;

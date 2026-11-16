@@ -1,6 +1,6 @@
 {
   "name": "@getmyenv/crypto",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Encryption for getmyenv: Argon2id-wrapped X25519 keys, sealed per-context keys, AES-256-GCM values",
   "type": "module",
   "main": "./dist/index.js",
@@ -49,9 +49,9 @@
     "access": "public"
   },
   "dependencies": {
-    "@noble/ciphers": "^1.2.1",
+    "@noble/ciphers": "^2.4.0",
     "@noble/curves": "^2.4.0",
-    "@noble/hashes": "^1.7.1",
+    "@noble/hashes": "^2.4.0",
     "hash-wasm": "^4.12.0"
   },
   "devDependencies": {

@@ -10,6 +10,8 @@ import {
 import { FACTS } from "./facts.js";
 
 const UNLINK = "Run: npx getmyenv unlink, then npx getmyenv";
+// A claimed guest finishes in the folder; unlink would lose claim.json.
+const FINISH_CLAIM = "Finish the claim in this folder: npx getmyenv claim";
 const NEW_SERVER_TOKEN = "Create a new server token in Project settings, Tokens.";
 const REMOVE_SERVER_TOKEN = "Remove GETMYENV_TOKEN from this server.";
 const PROJECT_GONE = new Set(["project_deleted", "guest_purged", "account_deleted"]);
@@ -20,7 +22,13 @@ describe("endedTokenMessage", () => {
       for (const kind of TOKEN_KINDS) {
         const msg = endedTokenMessage({ reason, kind, projectName: "my-app" });
         const step =
-          kind !== "server" ? UNLINK : PROJECT_GONE.has(reason) ? REMOVE_SERVER_TOKEN : NEW_SERVER_TOKEN;
+          reason === "guest_claimed"
+            ? FINISH_CLAIM
+            : kind !== "server"
+              ? UNLINK
+              : PROJECT_GONE.has(reason)
+                ? REMOVE_SERVER_TOKEN
+                : NEW_SERVER_TOKEN;
         expect(msg.endsWith(step)).toBe(true);
       }
     }

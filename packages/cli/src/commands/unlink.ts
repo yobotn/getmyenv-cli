@@ -1,12 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { pc } from "../lib/colors.js";
-import { TOKEN_ENDED_CODE } from "@getmyenv/shared";
 import {
   CLAIM_FILE_INVALID,
   claimFileInvalid,
   claimFilePath,
-  clearClaimFile,
   getLocalDir,
   promptConfirm,
   readClaimFile,
@@ -55,6 +53,13 @@ export function revokeFailedMessage(opts: { unreachable: boolean; guest: boolean
   return `${first} ${retry} To remove only the local files: npx getmyenv unlink --local`;
 }
 
+/** Why claim.json stays after unlink. */
+export function keptClaimFileMessage(tokenEnded: boolean): string {
+  return tokenEnded
+    ? "Kept claim.json. If the guest project was claimed, its values open only with this file. Finish the claim: npx getmyenv claim. If the project was deleted, you can delete claim.json."
+    : "Kept claim.json. It holds the claim code and guest passphrase. Delete it if you do not need the project.";
+}
+
 /**
  * Unlink this folder: revoke its token and remove local getmyenv files.
  * The project, its contexts and values stay. A committed project.json stays
@@ -98,7 +103,7 @@ export async function unlinkCommand(opts: UnlinkOpts): Promise<void> {
     }
   }
 
-  let guestEnded = false;
+  let tokenEnded = false;
   if (folder && opts.local) {
     console.log(
       pc.yellow(
@@ -117,9 +122,10 @@ export async function unlinkCommand(opts: UnlinkOpts): Promise<void> {
         console.log(`${pc.green("✓")} Token revoked`);
       }
     } catch (err) {
-      // 401/404: the token is already gone on the server. Anything else keeps
+      // 401/404: the token is already gone on the server. 410: its guest project was
+      // claimed or expired, so the token cannot do anything. Anything else keeps
       // token.json, so a still-valid token is never left without a local copy.
-      if (!(err instanceof ApiError && (err.status === 401 || err.status === 404))) {
+      if (!(err instanceof ApiError && (err.status === 401 || err.status === 404 || err.status === 410))) {
         throw new Error(
           revokeFailedMessage({
             unreachable: err instanceof ApiError && err.status === 0,
@@ -128,8 +134,7 @@ export async function unlinkCommand(opts: UnlinkOpts): Promise<void> {
         );
       }
       console.log(pc.dim("The token already no longer works on the server."));
-      // A guest token only ends when its project was claimed or deleted. claim.json is no use then.
-      guestEnded = err.code === TOKEN_ENDED_CODE && readClaimFile() !== null;
+      tokenEnded = true;
     }
   } else if (brokenToken) {
     console.log(
@@ -149,14 +154,12 @@ export async function unlinkCommand(opts: UnlinkOpts): Promise<void> {
     fs.unlinkSync(projectFile);
     console.log(`${pc.green("✓")} Removed project.json`);
   }
-  if (guestEnded && clearClaimFile()) {
-    console.log(`${pc.green("✓")} Removed claim.json. The guest project was claimed or deleted, so it has no use.`);
-  } else if (claimFileInvalid()) {
+  // claim.json always stays. A guest token also ends when the project is claimed in the
+  // browser, and until claim runs here, the context keys open only with this file.
+  if (claimFileInvalid()) {
     console.log(pc.yellow(`Kept claim.json. ${CLAIM_FILE_INVALID}`));
   } else if (readClaimFile()) {
-    console.log(
-      pc.yellow("Kept claim.json. It holds the claim code and guest passphrase. Delete it if you do not need the project.")
-    );
+    console.log(pc.yellow(keptClaimFileMessage(tokenEnded)));
   }
   try {
     const dir = getLocalDir();

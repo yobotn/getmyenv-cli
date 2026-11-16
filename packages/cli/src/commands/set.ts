@@ -34,10 +34,43 @@ export function missingNames(
   return keys.filter((k) => (k.status[slug] ?? "missing") === "missing").map((k) => k.name);
 }
 
+/** Prefixes of well-known API keys and tokens (Stripe, OpenAI, GitHub, Slack, GitLab, Google). AWS is checked apart. */
+const SECRET_PREFIXES = ["sk_", "sk-", "pk_live", "rk_", "ghp_", "gho_", "github_pat_", "xox", "glpat-", "AIza"];
+
+/** Shannon entropy in bits per character. */
+function entropy(text: string): number {
+  const counts = new Map<string, number>();
+  for (const ch of text) counts.set(ch, (counts.get(ch) ?? 0) + 1);
+  let bits = 0;
+  for (const n of counts.values()) {
+    const p = n / text.length;
+    bits -= p * Math.log2(p);
+  }
+  return bits;
+}
+
+/**
+ * A secret pasted where a name goes. Some are valid names (an AWS key id is
+ * uppercase letters and digits), so the name check alone does not catch them.
+ * Real names are words joined by underscores; a key is one long random run.
+ */
+export function looksLikeSecret(name: string): boolean {
+  // AWS key ids are one unbroken run, so ASIA_PACIFIC_REGION stays a name.
+  if (/^(AKIA|ASIA)[A-Z0-9]{12,}$/.test(name)) return true;
+  if (name.length >= 16 && SECRET_PREFIXES.some((p) => name.startsWith(p))) return true;
+  if (name.length < 20 || !/[0-9]/.test(name) || !/[A-Za-z]/.test(name)) return false;
+  const longestRun = Math.max(...name.split(/[_.-]/).map((part) => part.length));
+  return longestRun >= 16 && entropy(name) >= 3.5;
+}
+
 /** `set sk_live_...` without `KEY=` puts the value where the name goes. Never print it. */
 function looksLikeValue(name: string): boolean {
-  return name.length >= 24 || /[^A-Za-z0-9_.-]/.test(name);
+  return name.length >= 24 || /[^A-Za-z0-9_.-]/.test(name) || looksLikeSecret(name);
 }
+
+/** A valid name that looks like a secret. The name is not shown. */
+export const SECRET_NAME_MESSAGE =
+  "That name looks like a secret value, such as an API key, so it is not shown and nothing was saved. Use a name like API_KEY.";
 
 export function invalidNameMessage(name: string): string {
   if (looksLikeValue(name)) {
@@ -85,6 +118,9 @@ export async function setCommand(args: string[], opts: SetOpts): Promise<void> {
   for (const p of pairs) {
     if (!variableNameSchema.safeParse(p.name).success) {
       throw new Error(invalidNameMessage(p.name));
+    }
+    if (looksLikeSecret(p.name)) {
+      throw new Error(`${SECRET_NAME_MESSAGE} Set a value with KEY=VALUE, or set KEY to be prompted.`);
     }
   }
   const own = ownEnvNameError(pairs.map((p) => p.name));

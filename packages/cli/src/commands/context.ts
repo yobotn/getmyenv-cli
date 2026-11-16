@@ -11,6 +11,10 @@ type Opts = { apiUrl?: string };
 
 export async function contextListCommand(opts: Opts): Promise<void> {
   const { who, meta } = await ensureTokenAndLink({ apiUrl: opts.apiUrl, quiet: true });
+  if (who.contexts.length === 0) {
+    console.log(pc.dim("No contexts yet. Add one: npx getmyenv context create staging"));
+    return;
+  }
   const current = defaultContextSlug(who, meta);
   const width = Math.max(...who.contexts.map((c) => c.slug.length), 4);
   for (const c of who.contexts) {

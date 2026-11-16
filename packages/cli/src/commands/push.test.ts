@@ -115,4 +115,43 @@ describe("push", () => {
     expect(body.fingerprint).toBe(pushFingerprint(key, values));
     expect(JSON.stringify(body)).not.toContain("sk_live_x");
   });
+
+  it("exits 1 when a variable could not be pruned", async () => {
+    apply.mockResolvedValue({
+      written: [{ name: "API_KEY", type: "sensitive" }],
+      pruned: [],
+      notPruned: [{ name: "OLD_KEY", reason: "403 Forbidden" }],
+      notWritten: [],
+      notes: [],
+    });
+    request.mockResolvedValue({ ok: true });
+    const before = process.exitCode;
+    try {
+      process.exitCode = undefined;
+      await pushCommand("vercel", { yes: true, prune: true });
+      expect(process.exitCode).toBe(1);
+      expect(out.join("\n")).toContain("Not pruned:");
+    } finally {
+      process.exitCode = before;
+    }
+  });
+
+  it("exits 0 when everything was pushed and pruned", async () => {
+    apply.mockResolvedValue({
+      written: [{ name: "API_KEY", type: "sensitive" }],
+      pruned: ["OLD_KEY"],
+      notPruned: [],
+      notWritten: [],
+      notes: [],
+    });
+    request.mockResolvedValue({ ok: true });
+    const before = process.exitCode;
+    try {
+      process.exitCode = undefined;
+      await pushCommand("vercel", { yes: true, prune: true });
+      expect(process.exitCode).toBeUndefined();
+    } finally {
+      process.exitCode = before;
+    }
+  });
 });

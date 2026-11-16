@@ -221,5 +221,6 @@ export async function pushCommand(providerArg: string, opts: PushOpts): Promise<
       console.log(pc.yellow(`The push worked, but getmyenv could not record it: ${(err as Error).message}`));
     }
   }
-  if (result.notWritten.length > 0) process.exitCode = 1;
+  // Anything left undone (not pushed, or not pruned) fails the command.
+  if (result.notWritten.length > 0 || result.notPruned.length > 0) process.exitCode = 1;
 }

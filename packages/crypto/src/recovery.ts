@@ -158,7 +158,7 @@ export async function assertRecoveryWrap(
   const key = await unwrapWithRecoveryCode(code, wrapped);
   try {
     if (publicKeyFromPrivate(key) !== publicKey) {
-      throw new Error("The recovery code does not match this vault key.");
+      throw new Error("The recovery code does not match this private key.");
     }
   } finally {
     wipe(key);

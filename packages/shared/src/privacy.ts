@@ -66,12 +66,12 @@ export const LEGAL_PAGES = {
   privacy: {
     path: "apps/web/src/app/privacy/page.tsx",
     updated: "2026-11-16",
-    hash: "36c55a4509d79727",
+    hash: "cb80761296778655",
   },
   terms: {
     path: "apps/web/src/app/terms/page.tsx",
     updated: "2026-11-16",
-    hash: "13a8ba2cbf175475",
+    hash: "1949b2c8ffa06818",
   },
 } as const;
 

@@ -74,15 +74,28 @@ export function printGuestBanner(who: WhoamiResponse): void {
   console.error(pc.yellow(`Guest project. ${when} Keep it: npx getmyenv claim.${needClaim}\n`));
 }
 
+/** The step the server suggests after a guest project was claimed. */
+const CLAIMED_NEXT_STEP = /\s*(Run: npx getmyenv unlink, then npx getmyenv|Sign in: npx getmyenv)\s*$/;
+
+/**
+ * A claimed guest project whose keys may still be sealed to the guest key:
+ * claim.json finishes the hand-over, and unlink would be the wrong step.
+ * Any other message is returned as is.
+ */
+export function claimedGuestMessage(message: string, hasClaimFile: boolean): string {
+  if (!hasClaimFile || !/\bwas claimed\./.test(message)) return message;
+  return `${message.replace(CLAIMED_NEXT_STEP, "")} Finish the claim in this folder: npx getmyenv claim`;
+}
+
 export async function fetchWhoami(client: ApiClient): Promise<WhoamiResponse> {
   try {
     return await client.request<WhoamiResponse>("GET", "/api/cli/whoami");
   } catch (err) {
     if (err instanceof ApiError && err.status === 410) {
-      throw new Error(err.message);
+      throw new Error(claimedGuestMessage(err.message, readClaimFile() !== null));
     }
     if (err instanceof ApiError && err.status === 401 && err.code === TOKEN_ENDED_CODE) {
-      throw new Error(err.message);
+      throw new Error(claimedGuestMessage(err.message, readClaimFile() !== null));
     }
     if (err instanceof ApiError && err.status === 401) {
       throw new Error(

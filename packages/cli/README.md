@@ -50,7 +50,7 @@ my-app/
 ```
 
 <!-- cli:help -->
-Output of `npx getmyenv --help` (1.1.0):
+Output of `npx getmyenv --help` (1.1.1):
 
 ```text
 Usage: getmyenv [options] [command]

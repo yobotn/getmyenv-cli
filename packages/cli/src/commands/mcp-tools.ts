@@ -16,6 +16,7 @@ import {
   unsafeEnvError,
   unsafeEnvWarning,
   validationError,
+  VARIABLE_NAME_HELP,
   variableNameSchema,
   type CliMcpTool,
   type MissingKey,
@@ -28,7 +29,7 @@ import { readTemplateFile, syncFromLinked } from "../lib/template-file.js";
 import { assertWritable, uploadValues } from "../lib/upload.js";
 import { createContext } from "./context.js";
 import { createGuestProject } from "./guest.js";
-import { invalidNameMessage, missingNames } from "./set.js";
+import { looksLikeSecret, missingNames } from "./set.js";
 import { runLine } from "./start.js";
 
 /**
@@ -222,12 +223,19 @@ function checkNames(raw: string[]): { names: string[] } | { error: string } {
         "declare_variables takes names only, never values. An entry has \"=\", so it is not shown and nothing was sent. Pass names like API_KEY, then call ask_human_for_values so the human types the values in a hidden prompt.",
     };
   }
-  const names = [...new Set(raw.map((n) => n.trim()))];
-  for (const name of names) {
+  // A rejected entry may be a secret, so it is named by position, never echoed.
+  const trimmed = raw.map((n) => n.trim());
+  for (const [i, name] of trimmed.entries()) {
+    if (looksLikeSecret(name)) {
+      return {
+        error: `Entry ${i + 1} looks like a secret value, such as an API key, not a variable name. It is not shown and nothing was sent. Pass names like API_KEY, then call ask_human_for_values so the human types the values in a hidden prompt.`,
+      };
+    }
     if (!variableNameSchema.safeParse(name).success) {
-      return { error: `${invalidNameMessage(name)} Nothing was sent.`.replace("Use KEY=VALUE, or set KEY to be prompted. ", "") };
+      return { error: `Entry ${i + 1} is not a valid variable name. ${VARIABLE_NAME_HELP} Nothing was sent.` };
     }
   }
+  const names = [...new Set(trimmed)];
   const own = ownEnvNameError(names);
   if (own) return { error: own };
   return { names };

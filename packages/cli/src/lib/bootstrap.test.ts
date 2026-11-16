@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TOKEN_ENDED_CODE } from "@getmyenv/shared";
 import { ApiError, type ApiClient } from "./api.js";
-import { fetchWhoami, NOT_LINKED_STEPS, notLinkedMessage } from "./bootstrap.js";
+import { claimedGuestMessage, fetchWhoami, NOT_LINKED_STEPS, notLinkedMessage } from "./bootstrap.js";
 
 function failingClient(err: Error): ApiClient {
   return { request: vi.fn().mockRejectedValue(err) } as unknown as ApiClient;
@@ -33,5 +33,24 @@ describe("fetchWhoami", () => {
     vi.stubEnv("GETMYENV_TOKEN", "");
     const client = failingClient(new ApiError("Unauthorized", 401));
     await expect(fetchWhoami(client)).rejects.toThrow("This folder's token no longer works");
+  });
+});
+
+describe("claimedGuestMessage", () => {
+  const ended = 'The guest project "Acme" was claimed. Run: npx getmyenv unlink, then npx getmyenv';
+
+  it("points to claim, not unlink, while claim.json is here", () => {
+    expect(claimedGuestMessage(ended, true)).toBe(
+      'The guest project "Acme" was claimed. Finish the claim in this folder: npx getmyenv claim'
+    );
+    expect(claimedGuestMessage("This project was claimed. Sign in: npx getmyenv", true)).toBe(
+      "This project was claimed. Finish the claim in this folder: npx getmyenv claim"
+    );
+  });
+
+  it("leaves other messages, and folders without claim.json, as they are", () => {
+    expect(claimedGuestMessage(ended, false)).toBe(ended);
+    const deleted = 'The guest project "Acme" expired and was deleted. Run: npx getmyenv unlink, then npx getmyenv';
+    expect(claimedGuestMessage(deleted, true)).toBe(deleted);
   });
 });

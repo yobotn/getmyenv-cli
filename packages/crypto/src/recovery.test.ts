@@ -122,7 +122,7 @@ describe("recovery wrap", { timeout: 30_000 }, () => {
     const b = generateKeypair();
     const recovery = await createRecoveryWrap(b.privateKey);
     await expect(assertRecoveryWrap(recovery.code, recovery.wrapped, a.publicKey)).rejects.toThrow(
-      "The recovery code does not match this vault key."
+      "The recovery code does not match this private key."
     );
   });
 });

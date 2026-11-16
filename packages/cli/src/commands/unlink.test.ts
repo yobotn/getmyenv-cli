@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { revokeFailedMessage, unlinkCommand } from "./unlink.js";
+import { keptClaimFileMessage, revokeFailedMessage, unlinkCommand } from "./unlink.js";
 
 const prev = process.cwd();
 let dir = "";
@@ -84,6 +84,42 @@ describe("unlink", () => {
     fs.writeFileSync(path.join(dir, ".getmyenv", "token.json"), "{ broken");
     await unlinkCommand({ yes: true });
     expect(fs.existsSync(path.join(dir, ".getmyenv", "token.json"))).toBe(false);
+  });
+});
+
+describe("unlink a guest folder whose token ended", () => {
+  const claimFile = () => path.join(dir, ".getmyenv", "claim.json");
+
+  function guestFolder(): void {
+    clone();
+    fs.writeFileSync(path.join(dir, ".getmyenv", "token.json"), JSON.stringify(TOKEN));
+    fs.writeFileSync(
+      claimFile(),
+      JSON.stringify({ version: 1, claimCode: "CODE", passphrase: "pass", projectId: "p1", projectName: "Acme", guestExpiresAt: "" })
+    );
+  }
+
+  function respond(body: unknown, status: number) {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status })));
+  }
+
+  it("keeps claim.json after the project was claimed in the browser, and points to claim", async () => {
+    guestFolder();
+    respond({ error: 'The guest project "Acme" was claimed.', code: "token_ended" }, 401);
+    await unlinkCommand({ yes: true, apiUrl: "http://127.0.0.1:9" });
+    expect(fs.existsSync(claimFile())).toBe(true);
+    expect(fs.existsSync(path.join(dir, ".getmyenv", "token.json"))).toBe(false);
+    expect(out.join("\n")).toContain(keptClaimFileMessage(true));
+    expect(keptClaimFileMessage(true)).toContain("npx getmyenv claim");
+  });
+
+  it("treats a 410 (claimed or expired guest) as already ended and cleans up", async () => {
+    guestFolder();
+    respond({ error: "Guest project expired.", code: "gone" }, 410);
+    await unlinkCommand({ yes: true, apiUrl: "http://127.0.0.1:9" });
+    expect(fs.existsSync(path.join(dir, ".getmyenv", "token.json"))).toBe(false);
+    expect(fs.existsSync(claimFile())).toBe(true);
+    expect(out.join("\n")).toContain("The token already no longer works on the server.");
   });
 });
 

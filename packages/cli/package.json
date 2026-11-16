@@ -1,6 +1,6 @@
 {
   "name": "getmyenv",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "CLI for getmyenv, an encrypted store for environment variables and secrets. We store ciphertext only.",
   "type": "module",
   "bin": {

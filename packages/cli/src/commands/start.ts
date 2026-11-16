@@ -116,7 +116,10 @@ export async function startSetup(opts: {
 
   if (existing?.projectId) {
     console.error(`This folder uses ${pc.bold(existing.projectName ?? existing.projectId)}. Sign in to get a token.\n`);
-    await authorizeFolder({ apiUrl });
+    await authorizeFolder({
+      apiUrl,
+      expected: { id: existing.projectId, name: existing.projectName ?? existing.projectId },
+    });
     if (opts.template) {
       const { context } = await applyTemplate(opts.template, { apiUrl });
       if (!opts.thenContinue) printRunLine(context, opts.template.startCommand);

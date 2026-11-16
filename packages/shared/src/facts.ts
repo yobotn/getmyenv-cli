@@ -115,6 +115,7 @@ export const FACTS = {
     "In the same message, ask how to enter secret values. First declare the names with no values: npx getmyenv set KEY1= KEY2=. Names are safe to share. Then recommend the hidden prompt: the human runs npx getmyenv set --missing in a terminal and types each value, which never enters the chat. With an account, the dashboard works too. If the human pastes a value in chat instead, it is sent to your AI provider, so tell them to rotate it at its provider afterwards. Values not secret, like LOG_LEVEL, can use set KEY=value. import reads .env files directly. If you cannot ask, declare the names and tell the human to run npx getmyenv set --missing.",
   envFileScripts:
     "With runtime, remove --env-file=.env only from scripts that load that file. run already puts the values in the environment, and node stops with an error when the file is missing.",
+  pilotShort: `Accounts created during the pilot stay free: up to ${PILOT_MAX_PROJECTS} projects, ${PILOT_MAX_CONTEXTS} contexts each.`,
   pilotLimits: `Accounts created during the pilot stay free, up to ${PILOT_MAX_PROJECTS} projects you own, ${PILOT_MAX_CONTEXTS} contexts each. Projects shared with you do not count.`,
   keyLimits: `A project holds up to ${MAX_KEYS_PER_PROJECT} variable names. A guest project holds up to ${GUEST_MAX_KEYS} until it is claimed.`,
   valueLimits: `Up to ${MAX_VALUES_PER_REQUEST} values per request. Each value's ciphertext is up to ${MAX_CIPHERTEXT_CHARS.toLocaleString("en-US")} characters, about ${MAX_VALUE_TEXT_KB} KB of text.`,

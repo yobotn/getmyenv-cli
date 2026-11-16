@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { pcErr as pc } from "./colors.js";
 import { CLI_VERSION } from "./api.js";
 
@@ -82,40 +83,20 @@ function updateCommand(): string {
     : "npx getmyenv@latest";
 }
 
-/** Refresh the cache in a detached process so the command never waits on npm. */
+/**
+ * Refresh the cache in a detached process so the command never waits on npm.
+ * The child runs `update-check-worker.js` from this package.
+ */
 function refreshInBackground(): void {
-  const script = `(${fetchAndCache.toString()})(${JSON.stringify(cachePath())}, ${FETCH_TIMEOUT_MS})`;
   try {
-    const child = spawn(process.execPath, ["-e", script], {
+    const worker = fileURLToPath(new URL("./update-check-worker.js", import.meta.url));
+    const child = spawn(process.execPath, [worker, cachePath(), String(FETCH_TIMEOUT_MS)], {
       detached: true,
       stdio: "ignore",
       windowsHide: true,
     });
     child.on("error", () => undefined);
     child.unref();
-  } catch {
-    /* fail open */
-  }
-}
-
-/** Runs in the background child. Self-contained: no imports from this module. */
-async function fetchAndCache(file: string, timeoutMs: number): Promise<void> {
-  const fs = await import("node:fs");
-  const path = await import("node:path");
-  const ctrl = new AbortController();
-  setTimeout(() => ctrl.abort(), timeoutMs).unref();
-  try {
-    const res = await fetch("https://registry.npmjs.org/getmyenv/latest", {
-      signal: ctrl.signal,
-      redirect: "error",
-    });
-    if (!res.ok) return;
-    const data = (await res.json()) as { version?: string };
-    if (!data.version) return;
-    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-    fs.writeFileSync(file, JSON.stringify({ latest: data.version, checkedAt: new Date().toISOString() }), {
-      mode: 0o600,
-    });
   } catch {
     /* fail open */
   }

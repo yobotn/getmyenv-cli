@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { formatCliError } from "@getmyenv/shared";
 import { runCli } from "./cli.js";
-import { ApiError } from "./lib/api.js";
+import { ApiError, cliErrorLines } from "./lib/api.js";
 import { maybeSuggestUpdate } from "./lib/update-check.js";
 
 /** After a timeout, how long the event loop may take to drain before we force the exit. */
@@ -13,9 +13,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((err: unknown) => {
-  const message = err instanceof Error ? err.message : "Unexpected error";
-  // Never print secret values - sanitize to message only
-  console.error(formatCliError(message));
+  // Never print secret values: the message and the server's hint only.
+  const [message, ...rest] = cliErrorLines(err);
+  console.error([formatCliError(message!), ...rest].join("\n"));
   // Not process.exit(): on Windows it can abort while sockets are still closing.
   process.exitCode = process.exitCode ? Number(process.exitCode) : 1;
   // A stalled socket can ignore the abort and keep the process (and npx's cache lock)

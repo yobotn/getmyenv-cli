@@ -52,6 +52,8 @@ function tokenNoun(kind: TokenKind): string {
 const PROJECT_GONE: ReadonlySet<EndedTokenReason> = new Set(["project_deleted", "guest_purged", "account_deleted"]);
 
 function nextStep(kind: TokenKind, reason?: EndedTokenReason): string {
+  // A claim finishes in the folder that holds claim.json. unlink first would lose that file's keys.
+  if (reason === "guest_claimed") return "Finish the claim in this folder: npx getmyenv claim";
   if (kind !== "server") return "Run: npx getmyenv unlink, then npx getmyenv";
   return reason && PROJECT_GONE.has(reason)
     ? "Remove GETMYENV_TOKEN from this server."

@@ -5,7 +5,7 @@ import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CLI_MCP_TOOLS } from "@getmyenv/shared";
 import { NOT_LINKED_STEPS } from "../lib/bootstrap.js";
-import { MCP_PROTOCOL_VERSION } from "../lib/mcp-protocol.js";
+import { MCP_PROTOCOL_VERSION, McpServer } from "../lib/mcp-protocol.js";
 import { createMcpServer, mcpCommand } from "./mcp.js";
 
 const API = "http://localhost:9";
@@ -36,6 +36,9 @@ type Call = { method: string; url: string; body: unknown };
 let dir = "";
 let calls: Call[] = [];
 const envBefore = { ...process.env };
+// mcpCommand overrides these for the life of the process. Put them back after each test.
+const ttyBefore = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
+const consoleBefore = { log: console.log, info: console.info, debug: console.debug };
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -107,6 +110,9 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  if (ttyBefore) Object.defineProperty(process.stdin, "isTTY", ttyBefore);
+  else delete (process.stdin as { isTTY?: boolean }).isTTY;
+  Object.assign(console, consoleBefore);
   process.env = { ...envBefore };
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -131,6 +137,47 @@ describe("MCP protocol", () => {
   it("offers its own version for a version it does not speak", async () => {
     const res = await rpc(server, "initialize", { protocolVersion: "1999-01-01", capabilities: {} });
     expect(res.result.protocolVersion).toBe(MCP_PROTOCOL_VERSION);
+  });
+
+  it("offers 2025-06-18 to older clients, since it refuses their batches", async () => {
+    for (const old of ["2025-03-26", "2024-11-05"]) {
+      expect((await rpc(server, "initialize", { protocolVersion: old })).result.protocolVersion).toBe("2025-06-18");
+    }
+  });
+
+  it("returns -32602 for params that are not an object", async () => {
+    for (const params of [[1, 2], "x", 3, null]) {
+      const res = await rpc(server, "ping", params);
+      expect(res.error.code).toBe(-32602);
+    }
+  });
+
+  it("sends no reply for a request the client cancelled", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow = new McpServer({ name: "t", version: "1" }, [
+      {
+        name: "wait",
+        title: "Wait",
+        description: "Waits",
+        inputSchema: { type: "object" },
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        run: async () => {
+          await gate;
+          return { content: [{ type: "text", text: "done" }] };
+        },
+      },
+    ]);
+    const req = (id: number) => slow.handleLine(JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name: "wait" } }));
+    const cancelled = req(7);
+    const kept = req(8);
+    const note = { jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 7, reason: "user" } };
+    expect(await slow.handleLine(JSON.stringify(note))).toBeNull();
+    // Cancelling an id that is not running changes nothing.
+    expect(await slow.handleLine(JSON.stringify({ ...note, params: { requestId: "7" } }))).toBeNull();
+    release();
+    expect(await cancelled).toBeNull();
+    expect(JSON.parse((await kept)!).result.content[0].text).toBe("done");
   });
 
   it("does not answer notifications", async () => {
@@ -216,6 +263,30 @@ describe("tools", () => {
     expect(res.result.isError).toBe(true);
     expect(JSON.stringify(res)).not.toContain(VALUE);
     expect(calls).toEqual([]);
+  });
+
+  it("declare_variables names a bad entry by position, never by its text", async () => {
+    linkedFolder();
+    const res = await call(createMcpServer({ apiUrl: API }), "declare_variables", { names: ["API_KEY", "database_url"] });
+    expect(res.result.isError).toBe(true);
+    expect(res.result.content[0].text).toContain("Entry 2 is not a valid variable name.");
+    expect(JSON.stringify(res)).not.toContain("database_url");
+    expect(calls).toEqual([]);
+  });
+
+  it("declare_variables refuses a valid name that looks like a secret", async () => {
+    linkedFolder();
+    // Built at runtime so secret scanners do not flag the source.
+    const awsKeyId = ["AKIA", "Z7Q2", "XK4P", "M9RT", "W3LB"].join("");
+    const randomRun = ["Q8ZK", "4MX2", "PL7W", "R9TB", "N3VC", "Y6HD"].join("");
+    for (const secret of [awsKeyId, randomRun]) {
+      calls = [];
+      const res = await call(createMcpServer({ apiUrl: API }), "declare_variables", { names: ["API_KEY", secret] });
+      expect(res.result.isError).toBe(true);
+      expect(res.result.content[0].text).toContain("Entry 2 looks like a secret value");
+      expect(JSON.stringify(res)).not.toContain(secret);
+      expect(calls).toEqual([]);
+    }
   });
 
   it("declare_variables declares names with no values", async () => {
@@ -314,7 +385,6 @@ describe("mcp on stdio", () => {
     const output = new PassThrough();
     const chunks: string[] = [];
     output.on("data", (c) => chunks.push(String(c)));
-    const log = console.log;
     const done = mcpCommand({ apiUrl: API }, { input, output });
     input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } })}\n`);
     input.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
@@ -324,7 +394,6 @@ describe("mcp on stdio", () => {
     input.end();
     await done;
     console.log("this goes to stderr now");
-    console.log = log;
     const lines = chunks.join("").split("\n").filter(Boolean);
     expect(lines).toHaveLength(3);
     const replies = lines.map((l) => JSON.parse(l));

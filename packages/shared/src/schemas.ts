@@ -87,7 +87,7 @@ export const encryptedValueSchema = z.object({
   name: variableNameSchema,
   ciphertext: ciphertextSchema,
   /** ISO-8601 with Z/offset, or null to clear. Omit to leave unchanged. */
-  expiresAt: z.string().datetime().nullable().optional(),
+  expiresAt: z.string().datetime({ offset: true }).nullable().optional(),
 });
 
 /**

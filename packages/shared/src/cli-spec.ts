@@ -59,6 +59,17 @@ export const CLI_MCP_TOOLS = [
 
 export type CliMcpTool = (typeof CLI_MCP_TOOLS)[number];
 
+/** One line per local MCP tool, for the docs and README. Typed by tool, so a new tool needs a line. */
+export const CLI_MCP_TOOL_SUMMARIES: Record<CliMcpTool, string> = {
+  status: "The linked project, its contexts and which variables have a value. Names only.",
+  list_contexts: "The contexts of the project.",
+  declare_variables: "Add the names the app needs, without values.",
+  create_guest_project: "Start a project without an account. The human claims it later with npx getmyenv claim.",
+  create_context: "Add a context, like staging, optionally copying the values of an open context.",
+  explain_run: "What run would pass to the app: each name and where its value comes from. Names only.",
+  ask_human_for_values: "Tells the human which names are missing and the command to type them.",
+};
+
 export const CLI_DESCRIPTION ="Keep using environment variables. Stop managing them as files.";
 
 /** On the root and on every command. */

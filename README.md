@@ -125,6 +125,12 @@ pnpm check    # build, unit tests, and a smoke test of the packed CLI
 
 This is a read-only copy. The CLI is developed together with the getmyenv service in a private repository, and every change to these packages is copied here automatically, after a secret scan and a full build and test.
 
+Releases are published to npm from this repository by the [Publish workflow](.github/workflows/publish.yml), with npm trusted publishing. No npm token is involved, and each version carries a provenance attestation that links it to the commit and workflow run that built it. To check the packages you installed:
+
+```bash
+npm audit signatures
+```
+
 Issues and ideas are welcome. For a pull request, open an issue first: accepted changes are applied in the main repository and then appear here.
 
 Found a security problem? Please do not open an issue. See [SECURITY.md](SECURITY.md).

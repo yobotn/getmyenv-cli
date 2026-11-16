@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { API_TIMEOUT_MS, ApiClient, ApiError, CONTACTING_AFTER_MS, resetContactingForTests } from "./api.js";
+import { API_TIMEOUT_MS, ApiClient, ApiError, cliErrorLines, CONTACTING_AFTER_MS, resetContactingForTests } from "./api.js";
 
 const client = new ApiClient("http://localhost:1", "tok");
 
@@ -109,5 +109,41 @@ describe("ApiClient.request", () => {
     const err = await errorOf(client.request("GET", "/x"));
     expect(err.status).toBe(503);
     expect(err.message).toBe("The getmyenv server had an error (HTTP 503). Try again in a moment.");
+  });
+});
+
+describe("API error hints", () => {
+  function respond(body: unknown, status: number) {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status })));
+  }
+
+  it("keeps the server's code and hint on a 4xx", async () => {
+    respond({ error: "Token ended.", code: "token_ended", hint: "Run npx getmyenv to sign in.", docs: "https://x" }, 401);
+    const err = await errorOf(client.request("GET", "/x"));
+    expect(err.message).toBe("Token ended.");
+    expect(err.code).toBe("token_ended");
+    expect(err.hint).toBe("Run npx getmyenv to sign in.");
+  });
+
+  it("ignores a hint that is not text", async () => {
+    respond({ error: "Bad.", code: "bad_request", hint: 42 }, 400);
+    expect((await errorOf(client.request("GET", "/x"))).hint).toBeUndefined();
+  });
+
+  it("drops the hint on a 5xx", async () => {
+    respond({ error: "boom", code: "internal_error", hint: "Contact support." }, 500);
+    const err = await errorOf(client.request("GET", "/x"));
+    expect(err.hint).toBeUndefined();
+    expect(cliErrorLines(err)).toEqual(["The getmyenv server had an error (HTTP 500). Try again in a moment."]);
+  });
+
+  it("prints the hint as a second line", () => {
+    expect(cliErrorLines(new ApiError("Token ended.", 401, "token_ended", "Run npx getmyenv to sign in."))).toEqual([
+      "Token ended.",
+      "Run npx getmyenv to sign in.",
+    ]);
+    expect(cliErrorLines(new ApiError("No hint.", 400))).toEqual(["No hint."]);
+    expect(cliErrorLines(new Error("Plain."))).toEqual(["Plain."]);
+    expect(cliErrorLines("x")).toEqual(["Unexpected error"]);
   });
 });

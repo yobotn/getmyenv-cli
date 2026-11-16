@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { invalidNameMessage, parseExpires, unsetNoChangeLines } from "./set.js";
+import { invalidNameMessage, looksLikeSecret, parseExpires, unsetNoChangeLines } from "./set.js";
 
 describe("parseExpires", () => {
   const now = new Date("2026-10-10T12:00:00Z");
@@ -48,5 +48,36 @@ describe("invalidNameMessage", () => {
       expect(msg).not.toContain(value.toUpperCase());
       expect(msg).toContain("It looks like a value");
     }
+  });
+});
+
+describe("looksLikeSecret", () => {
+  // Joined at runtime so secret scanners do not flag the source.
+  const awsKeyId = ["AKIA", "Z7Q2", "XK4P", "M9RT", "W3LB"].join("");
+  const randomRun = ["Q8ZK", "4MX2", "PL7W", "R9TB", "N3VC", "Y6HD"].join("");
+
+  it("flags known key prefixes and long random runs", () => {
+    for (const secret of [awsKeyId, randomRun, ["ghp", "a1B2c3D4e5F6g7H8i9"].join("_"), ["sk", "test", "4eC39HqLyjWDarjt"].join("_")]) {
+      expect(looksLikeSecret(secret)).toBe(true);
+    }
+  });
+
+  it("keeps ordinary names", () => {
+    for (const name of [
+      "API_KEY",
+      "ASIA_PACIFIC_REGION_ENDPOINT",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "AWS_SECRET_ACCESS_KEY",
+      "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID_2",
+      "OAUTH2_CLIENT_SECRET_V2",
+      "DATABASE_URL",
+    ]) {
+      expect(looksLikeSecret(name)).toBe(false);
+    }
+  });
+
+  it("an invalid name with a key prefix is never echoed", () => {
+    const short = ["sk", "test", "abcdefgh"].join("_");
+    expect(invalidNameMessage(short)).not.toContain(short);
   });
 });
