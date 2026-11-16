@@ -52,11 +52,14 @@ jobs:
           echo "Publish runs from main only."
           exit 1
 
-      # The npm bundled with Node 24 has no `npm stage`. Pinned, not latest.
+      # The npm bundled with Node 24 has no `npm stage`, and `npm install -g`
+      # lands outside the PATH that pnpm/setup's Node uses. So every staging
+      # call runs this exact npm through npx. Pinned, not latest.
       - name: npm with staged publishing
         run: |
-          npm install -g npm@11.21.2
-          npm --version
+          echo "STAGE_NPM=npx --yes npm@11.21.2" >> "$GITHUB_ENV"
+          npx --yes npm@11.21.2 --version
+          npx --yes npm@11.21.2 stage --help > /dev/null
 
       - run: pnpm install --frozen-lockfile
 
@@ -86,15 +89,17 @@ jobs:
             tgz=$(ls "$out"/*.tgz)
             echo "Contents of $name@$version:"
             tar -tzf "$tgz"
-            if [ "$DRY_RUN" = "true" ]; then
-              echo "Dry run: not staging $name@$version."
-              continue
-            fi
             # npm stage publish packs the current folder, so stage from the
             # unpacked pnpm tarball, where workspace:* is already a version.
             work="$RUNNER_TEMP/stage-$(basename "$dir")"
             rm -rf "$work" && mkdir -p "$work"
             tar -xzf "$tgz" -C "$work"
-            (cd "$work/package" && npm stage publish --access public --provenance)
-            echo "Staged $name@$version. Approve it with: npm stage list, then npm stage approve <stage-id>"
+            if [ "$DRY_RUN" = "true" ]; then
+              # Runs the real command with --dry-run: nothing is sent to npm.
+              (cd "$work/package" && $STAGE_NPM stage publish --access public --dry-run)
+              echo "Dry run: not staging $name@$version."
+              continue
+            fi
+            (cd "$work/package" && $STAGE_NPM stage publish --access public --provenance)
+            echo "Staged $name@$version. Approve it with: npx npm@11.21.2 stage list, then npx npm@11.21.2 stage approve <stage-id>"
           done
