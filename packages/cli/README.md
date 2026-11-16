@@ -1,5 +1,7 @@
 # getmyenv
 
+<a href="https://getmyenv.com"><img src="https://raw.githubusercontent.com/yobotn/getmyenv-cli/main/.github/assets/readme-banner.png" alt="getmyenv. Keep using environment variables. Stop managing them as files. npx getmyenv run -- npm run dev" width="900"></a>
+
 Keep using environment variables. Stop managing them as files.
 
 [getmyenv](https://getmyenv.com) is an encrypted store for environment variables and secrets. Use it from the dashboard or with `npx getmyenv`. We store ciphertext only.

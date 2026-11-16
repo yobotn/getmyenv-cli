@@ -1,10 +1,6 @@
 <div align="center">
 
-<a href="https://getmyenv.com"><img src="https://getmyenv.com/logo-mark.svg" alt="getmyenv" width="72" height="72"></a>
-
-# getmyenv
-
-**Keep using environment variables. Stop managing them as files.**
+<a href="https://getmyenv.com"><img src=".github/assets/readme-banner.png" alt="getmyenv. Keep using environment variables. Stop managing them as files. npx getmyenv run -- npm run dev" width="900"></a>
 
 Encrypted environment variables for any app. No SDK, no code changes.<br>
 Values are encrypted on your machine. The server stores ciphertext only.
@@ -34,6 +30,10 @@ That is the whole setup. Your app still reads `process.env`, `os.environ` or `EN
 ## Why
 
 `.env` files work until they don't. One copy lives on your laptop, another in a chat thread, an older one on the server, and nobody is sure which is current. A new teammate asks for "the env". An AI agent in your editor can read the file whenever it likes.
+
+<p align="center">
+  <img src=".github/assets/readme-hub.png" alt="Copies of the same variables in .env on a laptop, .env.local on a teammate's machine, a key pasted in chat, CI secrets, .env.production on a server and env.txt in an email all join one encrypted project, my-api, with Development, Staging and Production contexts." width="520">
+</p>
 
 getmyenv keeps the part that works, environment variables, and removes the file:
 
