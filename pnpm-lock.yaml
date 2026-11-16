@@ -179,10 +179,10 @@ importers:
         specifier: workspace:*
         version: link:../shared
       '@napi-rs/keyring':
-        specifier: ^2.1.0
+        specifier: ^2.1.2
         version: 2.1.2
       commander:
-        specifier: ^15.0.0
+        specifier: ^15.1.0
         version: 15.1.0
       dotenv:
         specifier: ^16.4.7
@@ -213,7 +213,7 @@ importers:
         specifier: ^2.4.0
         version: 2.4.0
       hash-wasm:
-        specifier: ^4.12.0
+        specifier: ^4.13.0
         version: 4.13.0
     devDependencies:
       '@types/node':
@@ -229,7 +229,7 @@ importers:
   packages/shared:
     dependencies:
       safe-regex2:
-        specifier: ^5.1.1
+        specifier: ^5.1.2
         version: 5.1.2
       zod:
         specifier: ^4.6.7
