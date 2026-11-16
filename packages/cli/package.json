@@ -1,0 +1,71 @@
+{
+  "name": "getmyenv",
+  "version": "1.1.0",
+  "description": "CLI for getmyenv, an encrypted store for environment variables and secrets. We store ciphertext only.",
+  "type": "module",
+  "bin": {
+    "getmyenv": "./dist/bin.js"
+  },
+  "main": "./dist/cli.js",
+  "types": "./dist/cli.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "prebuild": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "start": "node dist/bin.js",
+    "test": "vitest run --testTimeout=20000",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "homepage": "https://getmyenv.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yobotn/getmyenv-cli.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://getmyenv.com/contact",
+    "email": "hello@getmyenv.com"
+  },
+  "keywords": [
+    "env",
+    "dotenv",
+    "environment-variables",
+    "secrets",
+    "secrets-management",
+    "encryption",
+    "e2ee",
+    "end-to-end-encryption",
+    "cli",
+    "config",
+    "configuration",
+    "devops",
+    "vault",
+    ".env",
+    "api-keys"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@getmyenv/crypto": "workspace:*",
+    "@getmyenv/shared": "workspace:*",
+    "@napi-rs/keyring": "^2.1.0",
+    "commander": "^15.0.0",
+    "dotenv": "^16.4.7",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

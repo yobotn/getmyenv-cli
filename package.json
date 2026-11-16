@@ -1,0 +1,19 @@
+{
+  "name": "getmyenv-cli-repo",
+  "private": true,
+  "description": "Source of the getmyenv CLI and its libraries. Read-only copy, published from the getmyenv repository.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@12.5.1",
+  "scripts": {
+    "build": "pnpm --filter @getmyenv/shared build && pnpm --filter @getmyenv/crypto build && pnpm --filter getmyenv build",
+    "test": "pnpm -r test",
+    "smoke": "node scripts/smoke-cli.mjs",
+    "check": "pnpm build && pnpm test && pnpm smoke"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.11"
+  }
+}

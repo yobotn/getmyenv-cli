@@ -1,0 +1,61 @@
+{
+  "name": "@getmyenv/shared",
+  "version": "0.13.2",
+  "description": "Shared schemas and events for getmyenv",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "node --experimental-vm-modules ../../node_modules/vitest/vitest.mjs run",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "homepage": "https://getmyenv.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yobotn/getmyenv-cli.git",
+    "directory": "packages/shared"
+  },
+  "bugs": {
+    "url": "https://getmyenv.com/contact",
+    "email": "hello@getmyenv.com"
+  },
+  "keywords": [
+    "getmyenv",
+    "env",
+    "environment-variables",
+    "secrets",
+    "schemas",
+    "dotenv"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "safe-regex2": "^5.1.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -1,0 +1,9 @@
+packages:
+  - "packages/*"
+
+shamefullyHoist: true
+strictPeerDependencies: false
+
+# pnpm blocks lifecycle scripts unless allowlisted.
+allowBuilds:
+  esbuild: true
