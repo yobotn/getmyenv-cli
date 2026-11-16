@@ -22,7 +22,11 @@ export function base64ToBytes(b64: string): Uint8Array {
 }
 
 export function bytesToBase64Url(bytes: Uint8Array): string {
-  return bytesToBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const b64 = bytesToBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_");
+  // Strip the = padding with a loop: /=+$/ is quadratic on long runs of =.
+  let end = b64.length;
+  while (end > 0 && b64[end - 1] === "=") end--;
+  return b64.slice(0, end);
 }
 
 export function base64UrlToBytes(b64url: string): Uint8Array {

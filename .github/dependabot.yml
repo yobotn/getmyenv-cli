@@ -1,0 +1,15 @@
+# This repository is a read-only copy: version bumps happen in the main
+# repository and arrive with the next sync. So no version update pull requests
+# here (limit 0). Dependabot security alerts and security updates stay on.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 0

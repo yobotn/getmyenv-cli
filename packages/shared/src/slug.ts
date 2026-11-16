@@ -60,10 +60,17 @@ export function slugify(name: string): string {
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
-  const hyphenated = folded
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return hyphenated.slice(0, CONTEXT_SLUG_MAX).replace(/-+$/g, "");
+  const hyphenated = trimHyphens(folded.replace(/[^a-z0-9]+/g, "-"));
+  return trimHyphens(hyphenated.slice(0, CONTEXT_SLUG_MAX));
+}
+
+/** Strip leading and trailing hyphens. A loop, since /-+$/ is quadratic on long runs of hyphens. */
+function trimHyphens(s: string): string {
+  let start = 0;
+  let end = s.length;
+  while (start < end && s[start] === "-") start++;
+  while (end > start && s[end - 1] === "-") end--;
+  return s.slice(start, end);
 }
 
 /** base, then base-2, base-3 ... while staying within the slug length limit. */

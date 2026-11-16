@@ -31,9 +31,27 @@ const PLAIN_ARG = /^[\w\-.:/\\+@]+$/;
  */
 export function windowsArgument(arg: string, batch = false): string {
   if (arg !== "" && PLAIN_ARG.test(arg)) return arg;
-  let quoted = arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, "$1$1");
-  quoted = `"${quoted}"`.replace(CMD_META, "^$1");
+  const quoted = `"${msvcrtEscape(arg)}"`.replace(CMD_META, "^$1");
   return batch ? quoted.replace(CMD_META, "^$1") : quoted;
+}
+
+/**
+ * MSVCRT escaping inside double quotes: backslashes before a quote are doubled
+ * and the quote becomes \", backslashes at the end are doubled, others stay.
+ * One pass; the regex form /(\\*)"/g is quadratic on long runs of backslashes.
+ */
+function msvcrtEscape(arg: string): string {
+  let out = "";
+  let backslashes = 0;
+  for (const ch of arg) {
+    if (ch === "\\") {
+      backslashes++;
+      continue;
+    }
+    out += ch === '"' ? "\\".repeat(backslashes * 2 + 1) + '"' : "\\".repeat(backslashes) + ch;
+    backslashes = 0;
+  }
+  return out + "\\".repeat(backslashes * 2);
 }
 
 /**

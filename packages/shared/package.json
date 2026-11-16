@@ -1,6 +1,6 @@
 {
   "name": "@getmyenv/shared",
-  "version": "0.13.2",
+  "version": "0.13.3",
   "description": "Shared schemas and events for getmyenv",
   "type": "module",
   "main": "./dist/index.js",
